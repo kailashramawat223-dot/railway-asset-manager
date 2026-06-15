@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RailTrack — Alerts</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <style>
+    .alert-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 18px;
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      transition: box-shadow 0.15s;
+    }
+    .alert-card:hover { box-shadow: var(--shadow-md); }
+    .alert-card.high   { background:#fff5f5; border-color:#f5c6c6; }
+    .alert-card.medium { background:#fffbf0; border-color:#f5e4a0; }
+    .alert-card.low    { background:#f0f6ff; border-color:#b8d0f5; }
+    .alert-icon { font-size: 1.5rem; flex-shrink: 0; margin-top: 1px; }
+    .alert-body { flex: 1; min-width: 0; }
+    .alert-title { font-weight: 700; font-size: 0.88rem; color: var(--grey-900); }
+    .alert-meta  { font-size: 0.78rem; color: var(--grey-500); margin-top: 2px; }
+    .alert-msg   { font-size: 0.82rem; color: var(--grey-700); margin-top: 4px; }
+    .severity-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 7px;
+    }
+    .dot-high   { background: var(--signal-red); }
+    .dot-medium { background: var(--rail-gold); }
+    .dot-low    { background: var(--steel); }
+    .summary-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .sum-card {
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      padding: 16px 18px;
+      border: 1.5px solid var(--grey-100);
+      text-align: center;
+    }
+    .sum-num  { font-size: 1.8rem; font-weight: 800; line-height: 1; }
+    .sum-label{ font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--grey-500); margin-top: 4px; }
+    .tab-bar  { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tab-btn  {
+      padding: 7px 16px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+      border: 1.5px solid var(--grey-300); background: var(--white);
+      cursor: pointer; transition: all 0.2s; color: var(--grey-700);
+    }
+    .tab-btn.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
+    .tab-btn .cnt {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--signal-red); color: var(--white);
+      border-radius: 10px; font-size: 0.68rem; padding: 1px 6px; margin-left: 5px;
+      min-width: 18px;
+    }
+    .tab-btn.active .cnt { background: rgba(255,255,255,0.25); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">🔔 Alerts & Notifications</div>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost btn-sm" onclick="loadNotifications()">↻ Refresh</button>
+      </div>
+    </header>
+
+    <main class="page-body">
+      <!-- Summary -->
+      <div class="summary-bar" id="summary-bar">
+        <div class="sum-card"><div class="sum-num" style="color:var(--signal-red)" id="s-overdue">—</div><div class="sum-label">Overdue Inspections</div></div>
+        <div class="sum-card"><div class="sum-num" style="color:var(--signal-red)" id="s-faulty">—</div><div class="sum-label">Faulty Assets</div></div>
+        <div class="sum-card"><div class="sum-num" style="color:var(--rail-gold)" id="s-warranty">—</div><div class="sum-label">Warranty Expiring</div></div>
+        <div class="sum-card"><div class="sum-num" style="color:var(--steel)" id="s-upcoming">—</div><div class="sum-label">Upcoming Inspections</div></div>
+      </div>
+
+      <!-- Filter Tabs -->
+      <div class="tab-bar">
+        <button class="tab-btn active" id="tab-all" onclick="setTab('all')">All <span class="cnt" id="cnt-all">0</span></button>
+        <button class="tab-btn" id="tab-overdue" onclick="setTab('overdue')">🔴 Overdue <span class="cnt" id="cnt-overdue">0</span></button>
+        <button class="tab-btn" id="tab-faulty" onclick="setTab('faulty')">⚠️ Faulty <span class="cnt" id="cnt-faulty">0</span></button>
+        <button class="tab-btn" id="tab-warranty" onclick="setTab('warranty')">🟡 Warranty <span class="cnt" id="cnt-warranty">0</span></button>
+        <button class="tab-btn" id="tab-upcoming" onclick="setTab('upcoming')">🔵 Upcoming <span class="cnt" id="cnt-upcoming">0</span></button>
+      </div>
+
+      <!-- Alert List -->
+      <div id="alerts-list">
+        <div class="flex-center" style="padding:60px"><span class="loader loader-dark"></span></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/sidebar.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error('Redirecting');
+renderSidebar('alerts');
+
+let allNotifications = [];
+let currentTab = 'all';
+
+const typeIcons = { overdue: '🔴', faulty: '⚠️', warranty: '🟡', upcoming: '🔵' };
+const typeLabels = { overdue: 'Overdue Inspection', faulty: 'Faulty Asset', warranty: 'Warranty Expiring', upcoming: 'Upcoming Inspection' };
+
+async function loadNotifications() {
+  document.getElementById('alerts-list').innerHTML = `<div class="flex-center" style="padding:60px"><span class="loader loader-dark"></span></div>`;
+
+  const res = await API.get('/notifications');
+  if (!res?.ok) {
+    document.getElementById('alerts-list').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Failed to load</h3><p>Could not reach the server.</p></div>`;
+    return;
+  }
+
+  allNotifications = res.data.notifications;
+  const { summary } = res.data;
+
+  // Update summary cards
+  document.getElementById('s-overdue').textContent  = summary.overdue;
+  document.getElementById('s-faulty').textContent   = summary.faulty;
+  document.getElementById('s-warranty').textContent = summary.warrantyExpiring;
+  document.getElementById('s-upcoming').textContent = summary.upcomingInspections;
+
+  // Update tab counts
+  document.getElementById('cnt-all').textContent      = allNotifications.length;
+  document.getElementById('cnt-overdue').textContent  = summary.overdue;
+  document.getElementById('cnt-faulty').textContent   = summary.faulty;
+  document.getElementById('cnt-warranty').textContent = summary.warrantyExpiring;
+  document.getElementById('cnt-upcoming').textContent = summary.upcomingInspections;
+
+  renderAlerts();
+}
+
+function setTab(tab) {
+  currentTab = tab;
+  ['all','overdue','faulty','warranty','upcoming'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+  });
+  renderAlerts();
+}
+
+function renderAlerts() {
+  const filtered = currentTab === 'all'
+    ? allNotifications
+    : allNotifications.filter(n => n.type === currentTab);
+
+  const container = document.getElementById('alerts-list');
+  if (!filtered.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">✅</div>
+        <h3>No alerts in this category</h3>
+        <p>Everything looks good here!</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(n => `
+    <div class="alert-card ${n.severity}" onclick="window.location.href='assets.html?id=${n.assetDbId}'">
+      <div class="alert-icon">${typeIcons[n.type] || 'ℹ️'}</div>
+      <div class="alert-body">
+        <div class="alert-title">${n.name}</div>
+        <div class="alert-meta">
+          <span class="text-mono" style="color:var(--steel)">${n.assetId}</span>
+          · ${n.category}
+          ${n.location ? ` · ${n.location}` : ''}
+        </div>
+        <div class="alert-msg">${n.message}</div>
+      </div>
+      <div>
+        <span class="badge ${n.severity === 'high' ? 'badge-danger' : n.severity === 'medium' ? 'badge-warning' : 'badge-info'}" style="white-space:nowrap">
+          ${typeLabels[n.type] || n.type}
+        </span>
+      </div>
+      <div class="severity-dot dot-${n.severity}"></div>
+    </div>
+  `).join('');
+}
+
+loadNotifications();
+</script>
+</body>
+</html>

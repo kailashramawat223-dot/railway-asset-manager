@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RailTrack — Asset Info</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <style>
+    body { background: linear-gradient(135deg, var(--navy) 0%, #1a3a7a 100%); min-height: 100vh; }
+    .public-wrap { max-width: 540px; margin: 0 auto; padding: 24px 16px; }
+    .pub-header { text-align: center; padding: 24px 0 20px; color: var(--white); }
+    .pub-logo { font-size: 1.4rem; font-weight: 900; letter-spacing: -0.5px; }
+    .pub-logo span { color: var(--rail-gold); }
+    .pub-sub { font-size: 0.72rem; color: rgba(255,255,255,0.55); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+    .pub-card { background: var(--white); border-radius: 16px; box-shadow: var(--shadow-lg); overflow: hidden; }
+    .pub-card-header {
+      background: var(--navy);
+      padding: 20px 22px;
+      display: flex; justify-content: space-between; align-items: flex-start;
+    }
+    .pub-asset-id { font-family: var(--font-mono); font-size: 0.8rem; color: var(--rail-gold); margin-bottom: 4px; }
+    .pub-asset-name { font-size: 1.2rem; font-weight: 800; color: var(--white); }
+    .pub-section { padding: 18px 22px; border-bottom: 1px solid var(--grey-100); }
+    .pub-section:last-child { border-bottom: none; }
+    .pub-section-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--grey-500); margin-bottom: 12px; }
+    .pub-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; }
+    .pub-label { color: var(--grey-500); }
+    .pub-value { font-weight: 600; color: var(--grey-900); text-align: right; }
+    .pub-footer { text-align: center; padding: 16px; color: rgba(255,255,255,0.45); font-size: 0.74rem; }
+    .login-cta {
+      display: block; text-align: center; margin: 14px;
+      padding: 12px; background: var(--navy); color: var(--white);
+      border-radius: var(--radius); font-weight: 600; font-size: 0.88rem;
+      text-decoration: none;
+    }
+    .login-cta:hover { background: var(--navy-light); color: var(--white); }
+  </style>
+</head>
+<body>
+  <div class="public-wrap">
+    <div class="pub-header">
+      <div class="pub-logo">Rail<span>Track</span></div>
+      <div class="pub-sub">Asset Management System</div>
+    </div>
+
+    <div id="loading" class="pub-card" style="padding:40px;text-align:center">
+      <span class="loader loader-dark"></span>
+      <div style="margin-top:12px;color:var(--grey-500);font-size:0.85rem">Loading asset information…</div>
+    </div>
+
+    <div id="asset-card" class="pub-card" style="display:none"></div>
+    <div id="error-card" class="pub-card" style="display:none;padding:40px;text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:10px">❓</div>
+      <div style="font-weight:700;color:var(--navy);margin-bottom:6px">Asset Not Found</div>
+      <div style="font-size:0.83rem;color:var(--grey-500)">This QR code may be invalid or the asset may have been removed.</div>
+    </div>
+
+    <div class="pub-footer">Powered by RailTrack Asset Manager · Indian Railways</div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const assetId = params.get('id');
+
+    async function loadAsset() {
+      if (!assetId) { showError(); return; }
+
+      const res = await fetch(`${CONFIG.API_BASE}/assets/${assetId}`);
+      const data = await res.json();
+
+      document.getElementById('loading').style.display = 'none';
+
+      if (!res.ok || !data.asset) { showError(); return; }
+      renderAsset(data.asset);
+    }
+
+    function showError() {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error-card').style.display = 'block';
+    }
+
+    function renderAsset(a) {
+      const statusColors = {
+        'Operational': '#1e8449', 'Under Maintenance': '#a07010',
+        'Faulty': '#c0392b', 'Decommissioned': '#6c757d', 'Standby': '#2e4a8a'
+      };
+
+      document.title = `${a.assetId} — ${a.name}`;
+      document.getElementById('asset-card').innerHTML = `
+        <div class="pub-card-header">
+          <div>
+            <div class="pub-asset-id">${a.assetId}</div>
+            <div class="pub-asset-name">${a.name}</div>
+          </div>
+          <span class="badge" style="background:rgba(255,255,255,0.12);color:${statusColors[a.status]||'#fff'};border:1px solid currentColor">${a.status}</span>
+        </div>
+
+        <div class="pub-section">
+          <div class="pub-section-label">Asset Details</div>
+          <div class="pub-row"><span class="pub-label">Category</span><span class="pub-value">${a.category}</span></div>
+          <div class="pub-row"><span class="pub-label">Manufacturer</span><span class="pub-value">${a.manufacturer || '—'}</span></div>
+          <div class="pub-row"><span class="pub-label">Model</span><span class="pub-value">${a.model || '—'}</span></div>
+          <div class="pub-row"><span class="pub-label">Serial No.</span><span class="pub-value" style="font-family:var(--font-mono);font-size:0.78rem">${a.serialNumber || '—'}</span></div>
+          ${a.description ? `<div style="margin-top:10px;padding:10px;background:var(--off-white);border-radius:6px;font-size:0.82rem;color:var(--grey-700)">${a.description}</div>` : ''}
+        </div>
+
+        <div class="pub-section">
+          <div class="pub-section-label">Location</div>
+          <div class="pub-row"><span class="pub-label">Zone</span><span class="pub-value">${a.location?.zone || '—'}</span></div>
+          <div class="pub-row"><span class="pub-label">Division</span><span class="pub-value">${a.location?.division || '—'}</span></div>
+          <div class="pub-row"><span class="pub-label">Station</span><span class="pub-value">${a.location?.station || '—'}</span></div>
+          <div class="pub-row"><span class="pub-label">Track / Platform</span><span class="pub-value">${a.location?.track || '—'}</span></div>
+        </div>
+
+        <div class="pub-section">
+          <div class="pub-section-label">Inspection & Warranty</div>
+          <div class="pub-row"><span class="pub-label">Purchase Date</span><span class="pub-value">${fmtDate(a.purchaseDate)}</span></div>
+          <div class="pub-row"><span class="pub-label">Warranty Expiry</span><span class="pub-value">${fmtDate(a.warrantyExpiry)}</span></div>
+          <div class="pub-row"><span class="pub-label">Last Inspected</span><span class="pub-value">${fmtDate(a.lastInspectionDate)}</span></div>
+          <div class="pub-row"><span class="pub-label">Next Inspection</span><span class="pub-value" style="color:${isOverdue(a.nextInspectionDate)?'var(--signal-red)':''}">${fmtDate(a.nextInspectionDate)}${isOverdue(a.nextInspectionDate)?' ⚠':''}  </span></div>
+        </div>
+
+        ${a.maintenanceLogs?.length ? `
+          <div class="pub-section">
+            <div class="pub-section-label">Recent Maintenance (${a.maintenanceLogs.length} total)</div>
+            ${a.maintenanceLogs.slice(-3).reverse().map(log => `
+              <div style="background:var(--off-white);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                  <span class="badge badge-info" style="font-size:0.7rem">${log.type}</span>
+                  <span style="font-size:0.75rem;color:var(--grey-500)">${fmtDate(log.date)}</span>
+                </div>
+                <div style="font-size:0.83rem;color:var(--grey-700)">${log.description}</div>
+                <div style="font-size:0.76rem;color:var(--grey-500);margin-top:3px">👷 ${log.technician}</div>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+
+        <a href="../index.html" class="login-cta">🔐 Staff Login — Full Management Dashboard</a>
+      `;
+      document.getElementById('asset-card').style.display = 'block';
+    }
+
+    function fmtDate(d) {
+      if (!d) return '—';
+      return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function isOverdue(d) {
+      if (!d) return false;
+      return new Date(d) < new Date();
+    }
+
+    loadAsset();
+  </script>
+</body>
+</html>

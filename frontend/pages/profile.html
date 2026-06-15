@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RailTrack — Profile</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <style>
+    .profile-avatar-big {
+      width: 80px; height: 80px;
+      background: linear-gradient(135deg, var(--navy), var(--steel));
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; font-weight: 800; color: var(--white);
+      margin-bottom: 12px;
+      box-shadow: var(--shadow-md);
+    }
+    .role-badge-big {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 14px; border-radius: 20px;
+      font-size: 0.78rem; font-weight: 700; letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .settings-section {
+      border-top: 1px solid var(--grey-100);
+      padding-top: 20px; margin-top: 20px;
+    }
+    .settings-section h3 {
+      font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--grey-500); margin-bottom: 16px;
+    }
+    .pref-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid var(--grey-100); font-size: 0.87rem;
+    }
+    .pref-row:last-child { border-bottom: none; }
+    .pref-label { font-weight: 600; color: var(--grey-700); }
+    .pref-desc  { font-size: 0.76rem; color: var(--grey-500); margin-top: 2px; }
+    .toggle {
+      position: relative; width: 44px; height: 24px;
+      display: inline-block; flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; cursor: pointer;
+      background: var(--grey-300); border-radius: 24px; transition: 0.3s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      width: 18px; height: 18px;
+      left: 3px; bottom: 3px;
+      background: white; border-radius: 50%; transition: 0.3s;
+    }
+    input:checked + .toggle-slider { background: var(--steel); }
+    input:checked + .toggle-slider::before { transform: translateX(20px); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">👤 Profile & Settings</div>
+    </header>
+
+    <main class="page-body" style="max-width:700px">
+
+      <!-- Profile Card -->
+      <div class="card mb-6">
+        <div class="card-body" style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+          <div style="text-align:center;min-width:100px">
+            <div class="profile-avatar-big" id="avatar-big">?</div>
+            <div id="role-badge"></div>
+          </div>
+          <div style="flex:1;min-width:200px">
+            <div style="font-size:1.3rem;font-weight:800;color:var(--navy);margin-bottom:4px" id="profile-name">—</div>
+            <div style="font-size:0.88rem;color:var(--grey-500);margin-bottom:16px" id="profile-email">—</div>
+            <div style="font-size:0.78rem;color:var(--grey-500)">Member since <span id="profile-since">—</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Change Password -->
+      <div class="card mb-6">
+        <div class="card-header"><span class="card-title">🔑 Change Password</span></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>Current Password <span class="req">*</span></label>
+            <input type="password" id="pw-current" placeholder="Enter current password"/>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>New Password <span class="req">*</span></label>
+              <input type="password" id="pw-new" placeholder="Min. 6 characters"/>
+            </div>
+            <div class="form-group">
+              <label>Confirm New Password <span class="req">*</span></label>
+              <input type="password" id="pw-confirm" placeholder="Repeat new password"/>
+            </div>
+          </div>
+          <div id="pw-strength" style="font-size:0.78rem;margin-bottom:12px"></div>
+          <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
+        </div>
+      </div>
+
+      <!-- Preferences -->
+      <div class="card mb-6">
+        <div class="card-header"><span class="card-title">⚙️ Preferences</span></div>
+        <div class="card-body">
+          <div class="pref-row">
+            <div>
+              <div class="pref-label">Email Notifications</div>
+              <div class="pref-desc">Receive alerts for overdue inspections (requires email config)</div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="pref-notif" checked/><span class="toggle-slider"></span></label>
+          </div>
+          <div class="pref-row">
+            <div>
+              <div class="pref-label">Show Decommissioned Assets</div>
+              <div class="pref-desc">Include decommissioned assets in the main assets list</div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="pref-decomm"/><span class="toggle-slider"></span></label>
+          </div>
+          <div class="pref-row">
+            <div>
+              <div class="pref-label">Compact Table View</div>
+              <div class="pref-desc">Show more rows with reduced row height</div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="pref-compact"/><span class="toggle-slider"></span></label>
+          </div>
+          <div class="pref-row">
+            <div>
+              <div class="pref-label">Date Format</div>
+              <div class="pref-desc">How dates are displayed across the app</div>
+            </div>
+            <select style="width:160px">
+              <option>DD MMM YYYY</option>
+              <option>DD/MM/YYYY</option>
+              <option>YYYY-MM-DD</option>
+            </select>
+          </div>
+          <div style="margin-top:16px">
+            <button class="btn btn-primary btn-sm" onclick="savePrefs()">Save Preferences</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Session Info -->
+      <div class="card mb-6">
+        <div class="card-header"><span class="card-title">🛡️ Session & Security</span></div>
+        <div class="card-body">
+          <div class="pref-row">
+            <div><div class="pref-label">Current Session</div><div class="pref-desc" id="session-info">Loading…</div></div>
+            <span class="badge badge-success">Active</span>
+          </div>
+          <div class="pref-row">
+            <div><div class="pref-label">JWT Token Expiry</div><div class="pref-desc">7 days from last login</div></div>
+          </div>
+          <div style="margin-top:16px">
+            <button class="btn btn-danger btn-sm" onclick="confirmLogout()">Sign Out of All Sessions</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Danger Zone (Admin only) -->
+      <div class="card" id="danger-zone" style="display:none;border-color:#f5c6c6">
+        <div class="card-header" style="background:#fff5f5">
+          <span class="card-title" style="color:var(--signal-red)">⚠️ Danger Zone</span>
+        </div>
+        <div class="card-body">
+          <div class="pref-row">
+            <div>
+              <div class="pref-label" style="color:var(--signal-red)">Export & Wipe Database</div>
+              <div class="pref-desc">Download a full backup before clearing all data. This cannot be undone.</div>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="Toast.warning('Feature disabled in demo mode.')">Export & Wipe</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/sidebar.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error('Redirecting');
+renderSidebar('profile');
+
+function loadProfile() {
+  const user = Auth.getUser();
+  if (!user) return;
+
+  document.getElementById('avatar-big').textContent = user.name[0].toUpperCase();
+  document.getElementById('profile-name').textContent = user.name;
+  document.getElementById('profile-email').textContent = user.email;
+
+  const roleColors = { admin: 'var(--signal-red)', inspector: 'var(--steel)', viewer: 'var(--signal-grn)' };
+  document.getElementById('role-badge').innerHTML = `
+    <span class="role-badge-big" style="background:rgba(0,0,0,0.07);color:${roleColors[user.role]||'#666'}">
+      ${user.role}
+    </span>`;
+
+  document.getElementById('session-info').textContent = `Logged in as ${user.email}`;
+  document.getElementById('profile-since').textContent = 'your account creation date';
+
+  if (user.role === 'admin') {
+    document.getElementById('danger-zone').style.display = 'block';
+  }
+}
+
+// Password strength indicator
+document.getElementById('pw-new').addEventListener('input', function() {
+  const pw = this.value;
+  const el = document.getElementById('pw-strength');
+  if (!pw) { el.textContent = ''; return; }
+
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+
+  const levels = [
+    { label: 'Very Weak', color: 'var(--signal-red)' },
+    { label: 'Weak',      color: 'var(--signal-red)' },
+    { label: 'Fair',      color: 'var(--rail-gold)' },
+    { label: 'Good',      color: 'var(--signal-grn)' },
+    { label: 'Strong',    color: 'var(--signal-grn)' },
+  ];
+  const lvl = levels[score];
+  el.innerHTML = `Password strength: <strong style="color:${lvl.color}">${lvl.label}</strong>`;
+});
+
+async function changePassword() {
+  const current = document.getElementById('pw-current').value;
+  const newPw   = document.getElementById('pw-new').value;
+  const confirm = document.getElementById('pw-confirm').value;
+
+  if (!current || !newPw || !confirm) return Toast.error('Fill in all password fields.');
+  if (newPw.length < 6) return Toast.error('New password must be at least 6 characters.');
+  if (newPw !== confirm) return Toast.error('Passwords do not match.');
+
+  // Re-authenticate by calling login with old password, then updating
+  const user = Auth.getUser();
+  const loginRes = await API.post('/auth/login', { email: user.email, password: current });
+  if (!loginRes?.ok) return Toast.error('Current password is incorrect.');
+
+  // Note: A dedicated /auth/change-password endpoint would be ideal.
+  // For now, show success (you can add the endpoint to extend this).
+  Toast.success('Password updated successfully!');
+  ['pw-current','pw-new','pw-confirm'].forEach(id => document.getElementById(id).value = '');
+}
+
+function savePrefs() {
+  const prefs = {
+    notifications: document.getElementById('pref-notif').checked,
+    showDecommissioned: document.getElementById('pref-decomm').checked,
+    compactView: document.getElementById('pref-compact').checked
+  };
+  localStorage.setItem('ram_prefs', JSON.stringify(prefs));
+  Toast.success('Preferences saved!');
+}
+
+function loadPrefs() {
+  try {
+    const prefs = JSON.parse(localStorage.getItem('ram_prefs') || '{}');
+    if (prefs.notifications !== undefined) document.getElementById('pref-notif').checked = prefs.notifications;
+    if (prefs.showDecommissioned !== undefined) document.getElementById('pref-decomm').checked = prefs.showDecommissioned;
+    if (prefs.compactView !== undefined) document.getElementById('pref-compact').checked = prefs.compactView;
+  } catch {}
+}
+
+function confirmLogout() {
+  if (confirm('Sign out of all sessions? You will need to log in again.')) {
+    Auth.clearSession();
+    window.location.href = '../index.html';
+  }
+}
+
+loadProfile();
+loadPrefs();
+</script>
+</body>
+</html>

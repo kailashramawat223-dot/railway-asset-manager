@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RailTrack — Reports</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <style>
+    .report-card {
+      background: var(--white);
+      border: 1.5px solid var(--grey-100);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      display: flex;
+      align-items: flex-start;
+      gap: 18px;
+      transition: box-shadow 0.2s;
+    }
+    .report-card:hover { box-shadow: var(--shadow-md); }
+    .report-icon {
+      width: 50px; height: 50px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+    .report-title { font-weight: 700; font-size: 0.95rem; color: var(--navy); margin-bottom: 4px; }
+    .report-desc  { font-size: 0.82rem; color: var(--grey-500); margin-bottom: 14px; line-height: 1.5; }
+    .chart-bar-row {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+    }
+    .chart-bar-label { font-size: 0.78rem; width: 140px; flex-shrink: 0; color: var(--grey-700); font-weight: 500; }
+    .chart-bar-track { flex: 1; background: var(--grey-100); border-radius: 4px; height: 10px; overflow: hidden; }
+    .chart-bar-fill  { height: 100%; border-radius: 4px; transition: width 0.7s ease; }
+    .chart-bar-count { font-size: 0.75rem; color: var(--grey-500); width: 28px; text-align: right; flex-shrink: 0; }
+    .filter-section { background: var(--off-white); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+    .filter-section label { font-size: 0.78rem; font-weight: 600; color: var(--grey-700); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">📊 Reports & Export</div>
+    </header>
+
+    <main class="page-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
+
+        <!-- Export: Assets CSV -->
+        <div class="report-card">
+          <div class="report-icon" style="background:rgba(30,132,73,0.1)">📋</div>
+          <div style="flex:1">
+            <div class="report-title">Asset Register — CSV</div>
+            <div class="report-desc">Export all asset details into a spreadsheet-ready CSV. Includes location, status, dates, and technical specs.</div>
+            <div class="filter-section">
+              <div class="form-row">
+                <div class="form-group" style="margin-bottom:0">
+                  <label>Filter by Status</label>
+                  <select id="exp-status">
+                    <option value="">All Statuses</option>
+                    <option>Operational</option><option>Under Maintenance</option>
+                    <option>Faulty</option><option>Standby</option><option>Decommissioned</option>
+                  </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0">
+                  <label>Filter by Category</label>
+                  <select id="exp-category">
+                    <option value="">All Categories</option>
+                    <option>Locomotive</option><option>Wagon</option><option>Coach</option>
+                    <option>Track</option><option>Signal</option><option>Bridge</option>
+                    <option>Station Equipment</option><option>Power Supply</option>
+                    <option>Communication</option><option>Other</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="exportCSV()">⬇ Download CSV</button>
+          </div>
+        </div>
+
+        <!-- Export: Maintenance CSV -->
+        <div class="report-card">
+          <div class="report-icon" style="background:rgba(46,74,138,0.1)">🔧</div>
+          <div style="flex:1">
+            <div class="report-title">Maintenance History — CSV</div>
+            <div class="report-desc">Export complete maintenance log across all assets. Includes technician, cost, type, and scheduled dates.</div>
+            <div style="height:76px"></div>
+            <button class="btn btn-primary" onclick="exportMaintenanceCSV()">⬇ Download CSV</button>
+          </div>
+        </div>
+
+        <!-- Export: JSON -->
+        <div class="report-card">
+          <div class="report-icon" style="background:rgba(232,160,32,0.1)">📦</div>
+          <div style="flex:1">
+            <div class="report-title">Full Data Export — JSON</div>
+            <div class="report-desc">Export entire asset database as structured JSON. Useful for backup or migration to another system.</div>
+            <div style="height:76px"></div>
+            <button class="btn btn-gold" onclick="exportJSON()">⬇ Download JSON</button>
+          </div>
+        </div>
+
+        <!-- Print QR Sheet -->
+        <div class="report-card">
+          <div class="report-icon" style="background:rgba(192,57,43,0.1)">🖨️</div>
+          <div style="flex:1">
+            <div class="report-title">Print QR Code Sheet</div>
+            <div class="report-desc">Generate a printable sheet of QR codes for all assets or a filtered set. Print and stick on assets.</div>
+            <div class="filter-section">
+              <div class="form-group" style="margin-bottom:0">
+                <label>Filter by Zone</label>
+                <select id="qr-zone">
+                  <option value="">All Zones</option>
+                  <option>Northern Railway</option><option>Southern Railway</option>
+                  <option>Eastern Railway</option><option>Western Railway</option>
+                  <option>Central Railway</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-danger" onclick="printQRSheet()">🖨️ Open Print Sheet</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analytics Charts -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">📈 Asset Analytics</span>
+          <button class="btn btn-ghost btn-sm" onclick="loadAnalytics()">↻ Refresh</button>
+        </div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px" id="analytics-area">
+            <div class="flex-center" style="grid-column:1/-1;padding:40px"><span class="loader loader-dark"></span></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- QR Print Modal -->
+<div class="modal-overlay" id="qr-print-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title">🖨️ QR Code Print Sheet</span>
+      <button class="modal-close" onclick="document.getElementById('qr-print-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="qr-sheet-body">
+      <div class="flex-center" style="padding:40px"><span class="loader loader-dark"></span></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('qr-print-modal').classList.remove('open')">Close</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Print</button>
+    </div>
+  </div>
+</div>
+
+<style>
+@media print {
+  .sidebar, .topbar, .topbar-actions, .modal-footer, .modal-header, .modal-close { display: none !important; }
+  .modal-overlay { position: static !important; background: none !important; }
+  .modal { box-shadow: none !important; max-width: 100% !important; }
+  .modal-body { overflow: visible !important; }
+}
+</style>
+
+<script src="../js/config.js"></script>
+<script src="../js/sidebar.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error('Redirecting');
+renderSidebar('reports');
+
+function buildExportURL(path, params = {}) {
+  const token = Auth.getToken();
+  const url = new URL(`${CONFIG.API_BASE}${path}`, window.location.origin);
+  Object.entries(params).forEach(([k, v]) => { if (v) url.searchParams.set(k, v); });
+  return { url: url.toString(), token };
+}
+
+function downloadViaFetch(apiPath, params, filename) {
+  const token = Auth.getToken();
+  const url = new URL(`${CONFIG.API_BASE}${apiPath}`, window.location.origin);
+  Object.entries(params).forEach(([k, v]) => { if (v) url.searchParams.set(k, v); });
+
+  Toast.info('Preparing download…');
+  fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } })
+    .then(res => res.blob())
+    .then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      Toast.success('Download started!');
+    })
+    .catch(() => Toast.error('Download failed.'));
+}
+
+function exportCSV() {
+  const status   = document.getElementById('exp-status').value;
+  const category = document.getElementById('exp-category').value;
+  downloadViaFetch('/export/csv', { status, category }, `railtrack_assets_${Date.now()}.csv`);
+}
+
+function exportMaintenanceCSV() {
+  downloadViaFetch('/export/maintenance-csv', {}, `railtrack_maintenance_${Date.now()}.csv`);
+}
+
+function exportJSON() {
+  downloadViaFetch('/export/json', {}, `railtrack_backup_${Date.now()}.json`);
+}
+
+async function printQRSheet() {
+  const zone = document.getElementById('qr-zone').value;
+  document.getElementById('qr-print-modal').classList.add('open');
+  const body = document.getElementById('qr-sheet-body');
+  body.innerHTML = `<div class="flex-center" style="padding:40px"><span class="loader loader-dark"></span></div>`;
+
+  let url = '/assets?limit=100&page=1';
+  if (zone) url += `&zone=${encodeURIComponent(zone)}`;
+  const res = await API.get(url);
+  if (!res?.ok) { body.innerHTML = '<p class="text-muted">Failed to load assets.</p>'; return; }
+
+  const assets = res.data.assets;
+  if (!assets.length) { body.innerHTML = '<div class="empty-state"><h3>No assets found</h3></div>'; return; }
+
+  // Fetch QR codes for each asset
+  body.innerHTML = `<div class="flex-center" style="padding:20px 0"><span class="loader loader-dark"></span><span style="margin-left:10px;color:var(--grey-500)">Loading ${assets.length} QR codes…</span></div>`;
+
+  const qrData = await Promise.all(
+    assets.map(a => API.get(`/assets/${a._id}/qr`))
+  );
+
+  body.innerHTML = `
+    <div style="font-size:0.78rem;color:var(--grey-500);margin-bottom:16px">
+      ${assets.length} QR code${assets.length !== 1 ? 's' : ''} · Generated ${new Date().toLocaleString('en-IN')}
+      ${zone ? ` · Zone: ${zone}` : ''}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px">
+      ${qrData.map((r, i) => r?.ok ? `
+        <div style="text-align:center;border:1px solid var(--grey-200);border-radius:8px;padding:12px;break-inside:avoid">
+          <img src="${r.data.qrCode}" style="width:110px;height:110px" alt="QR"/>
+          <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--steel);margin-top:6px">${r.data.assetId}</div>
+          <div style="font-size:0.72rem;color:var(--grey-700);margin-top:2px;font-weight:600">${r.data.name}</div>
+        </div>
+      ` : '').join('')}
+    </div>
+  `;
+}
+
+// ── Analytics ──────────────────────────────────────────────────────
+const PALETTE = ['#0f1f3d','#2e4a8a','#e8a020','#1e8449','#c0392b','#7f8c8d','#8e44ad','#16a085','#d35400','#2c3e50'];
+
+async function loadAnalytics() {
+  const area = document.getElementById('analytics-area');
+  area.innerHTML = `<div class="flex-center" style="grid-column:1/-1;padding:40px"><span class="loader loader-dark"></span></div>`;
+
+  const res = await API.get('/assets/stats');
+  if (!res?.ok) { area.innerHTML = '<p class="text-muted">Failed to load stats.</p>'; return; }
+
+  const { byStatus, byCategory } = res.data;
+  const maxSt = Math.max(...byStatus.map(s => s.count), 1);
+  const maxCat = Math.max(...byCategory.map(c => c.count), 1);
+
+  const statusColors = {
+    'Operational': '#1e8449',
+    'Under Maintenance': '#e8a020',
+    'Faulty': '#c0392b',
+    'Standby': '#2e4a8a',
+    'Decommissioned': '#7f8c8d'
+  };
+
+  area.innerHTML = `
+    <div>
+      <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--grey-500);margin-bottom:14px">By Status</div>
+      ${byStatus.map(s => `
+        <div class="chart-bar-row">
+          <div class="chart-bar-label">${s._id}</div>
+          <div class="chart-bar-track">
+            <div class="chart-bar-fill" style="width:${(s.count/maxSt*100).toFixed(1)}%;background:${statusColors[s._id]||'#666'}"></div>
+          </div>
+          <div class="chart-bar-count">${s.count}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div>
+      <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--grey-500);margin-bottom:14px">By Category</div>
+      ${byCategory.map((c, i) => `
+        <div class="chart-bar-row">
+          <div class="chart-bar-label">${c._id}</div>
+          <div class="chart-bar-track">
+            <div class="chart-bar-fill" style="width:${(c.count/maxCat*100).toFixed(1)}%;background:${PALETTE[i % PALETTE.length]}"></div>
+          </div>
+          <div class="chart-bar-count">${c.count}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+loadAnalytics();
+</script>
+</body>
+</html>

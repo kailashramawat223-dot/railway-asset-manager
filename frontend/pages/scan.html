@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RailTrack — QR Scanner</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <!-- ZXing QR scanner library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.20.0/index.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">⬛ QR Code Scanner</div>
+    </header>
+
+    <main class="page-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:900px;margin:0 auto">
+        <!-- Scanner Card -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">📷 Camera Scanner</span></div>
+          <div class="card-body">
+            <div id="scanner-status" style="text-align:center;padding:12px;background:var(--off-white);border-radius:var(--radius);font-size:0.85rem;color:var(--grey-500);margin-bottom:14px">
+              Click "Start Scanner" to begin scanning
+            </div>
+            <div class="scanner-area" id="scanner-area" style="display:none">
+              <video id="scanner-video" autoplay muted playsinline></video>
+              <div class="scan-overlay">
+                <div class="scan-frame"></div>
+                <div class="scan-line"></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+              <button class="btn btn-primary" id="btn-start" onclick="startScanner()">▶ Start Scanner</button>
+              <button class="btn btn-ghost" id="btn-stop" onclick="stopScanner()" style="display:none">⏹ Stop</button>
+            </div>
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--grey-100)">
+              <div style="font-size:0.8rem;font-weight:600;color:var(--grey-700);margin-bottom:8px">Or enter Asset ID manually:</div>
+              <div style="display:flex;gap:8px">
+                <input type="text" id="manual-id" placeholder="e.g. RA-00001" style="flex:1"/>
+                <button class="btn btn-gold" onclick="lookupManual()">Search</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Result Card -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">📋 Scan Result</span></div>
+          <div class="card-body">
+            <div id="scan-result-area">
+              <div class="empty-state">
+                <div class="empty-icon">⬛</div>
+                <h3>No scan yet</h3>
+                <p>Point the camera at an asset QR code</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="card" style="max-width:900px;margin:20px auto 0">
+        <div class="card-header">
+          <span class="card-title">🕑 Recent Scans</span>
+          <button class="btn btn-ghost btn-sm" onclick="clearHistory()">Clear</button>
+        </div>
+        <div class="card-body" id="scan-history">
+          <div class="text-muted text-sm">No scans yet this session.</div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/sidebar.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error('Redirecting');
+renderSidebar('scan');
+
+let codeReader = null;
+let scanHistory = [];
+let scanning = false;
+
+async function startScanner() {
+  try {
+    document.getElementById('scanner-status').textContent = '⏳ Requesting camera access…';
+    codeReader = new ZXing.BrowserQRCodeReader();
+    const videoDevices = await ZXing.BrowserCodeReader.listVideoInputDevices();
+    if (!videoDevices.length) {
+      document.getElementById('scanner-status').textContent = '❌ No camera found on this device.';
+      return;
+    }
+
+    document.getElementById('scanner-area').style.display = 'block';
+    document.getElementById('btn-start').style.display = 'none';
+    document.getElementById('btn-stop').style.display = 'inline-flex';
+    document.getElementById('scanner-status').textContent = '🟢 Scanning… Hold QR code in the frame.';
+    scanning = true;
+
+    // Use back camera if available
+    const deviceId = videoDevices.find(d => /back|rear|environment/i.test(d.label))?.deviceId || videoDevices[0].deviceId;
+
+    codeReader.decodeFromVideoDevice(deviceId, 'scanner-video', async (result, err) => {
+      if (result && scanning) {
+        scanning = false;
+        const text = result.getText();
+        document.getElementById('scanner-status').textContent = '✅ QR Code detected!';
+        await processQRResult(text);
+      }
+    });
+  } catch (err) {
+    document.getElementById('scanner-status').textContent = '❌ Camera error: ' + (err.message || 'Permission denied');
+  }
+}
+
+function stopScanner() {
+  if (codeReader) { codeReader.reset(); codeReader = null; }
+  scanning = false;
+  document.getElementById('scanner-area').style.display = 'none';
+  document.getElementById('btn-start').style.display = 'inline-flex';
+  document.getElementById('btn-stop').style.display = 'none';
+  document.getElementById('scanner-status').textContent = 'Scanner stopped. Click "Start Scanner" to begin again.';
+}
+
+async function processQRResult(text) {
+  stopScanner();
+  document.getElementById('scan-result-area').innerHTML = `<div class="flex-center" style="padding:30px"><span class="loader loader-dark"></span></div>`;
+
+  // Extract asset ID from URL or use raw text
+  let assetId = text;
+  try {
+    const url = new URL(text);
+    assetId = url.searchParams.get('id') || text;
+  } catch {}
+
+  const res = await API.get(`/assets/${assetId}`);
+  if (res?.ok) {
+    renderAssetResult(res.data.asset, text);
+    addToHistory(res.data.asset, text);
+  } else {
+    document.getElementById('scan-result-area').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">❓</div>
+        <h3>Asset Not Found</h3>
+        <p>QR data: <code style="font-size:0.72rem">${text}</code></p>
+      </div>`;
+  }
+}
+
+function renderAssetResult(a, rawText) {
+  document.getElementById('scan-result-area').innerHTML = `
+    <div style="padding:4px">
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:14px">
+        <div>
+          <div class="text-mono" style="font-size:0.8rem;color:var(--steel);margin-bottom:2px">${a.assetId}</div>
+          <div style="font-size:1.05rem;font-weight:700;color:var(--navy)">${a.name}</div>
+        </div>
+        ${Format.statusBadge(a.status)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+        <div style="background:var(--off-white);padding:10px;border-radius:6px">
+          <div style="font-size:0.7rem;color:var(--grey-500);margin-bottom:2px">CATEGORY</div>
+          <div style="font-size:0.85rem;font-weight:600">${a.category}</div>
+        </div>
+        <div style="background:var(--off-white);padding:10px;border-radius:6px">
+          <div style="font-size:0.7rem;color:var(--grey-500);margin-bottom:2px">ZONE</div>
+          <div style="font-size:0.85rem;font-weight:600">${a.location?.zone || '—'}</div>
+        </div>
+        <div style="background:var(--off-white);padding:10px;border-radius:6px">
+          <div style="font-size:0.7rem;color:var(--grey-500);margin-bottom:2px">STATION</div>
+          <div style="font-size:0.85rem;font-weight:600">${a.location?.station || '—'}</div>
+        </div>
+        <div style="background:var(--off-white);padding:10px;border-radius:6px">
+          <div style="font-size:0.7rem;color:var(--grey-500);margin-bottom:2px">LAST INSPECTED</div>
+          <div style="font-size:0.85rem;font-weight:600">${Format.date(a.lastInspectionDate)}</div>
+        </div>
+      </div>
+      ${a.description ? `<p style="font-size:0.82rem;color:var(--grey-600);margin-bottom:12px;padding:8px;background:var(--off-white);border-radius:6px">${a.description}</p>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="assets.html?id=${a._id}" class="btn btn-primary btn-sm">View Full Details</a>
+        <button class="btn btn-ghost btn-sm" onclick="startScanner()">📷 Scan Another</button>
+      </div>
+    </div>
+  `;
+}
+
+function addToHistory(asset, rawText) {
+  scanHistory.unshift({ asset, time: new Date(), rawText });
+  if (scanHistory.length > 10) scanHistory.pop();
+  renderHistory();
+}
+
+function renderHistory() {
+  const div = document.getElementById('scan-history');
+  div.innerHTML = scanHistory.length ? scanHistory.map((s,i) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;${i < scanHistory.length-1 ? 'border-bottom:1px solid var(--grey-100)' : ''}">
+      <div>
+        <span class="text-mono" style="font-size:0.78rem;color:var(--steel)">${s.asset.assetId}</span>
+        <span style="font-size:0.85rem;font-weight:600;margin-left:10px">${s.asset.name}</span>
+        ${Format.statusBadge(s.asset.status)}
+      </div>
+      <span class="text-sm text-muted">${s.time.toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})}</span>
+    </div>
+  `).join('') : '<div class="text-muted text-sm">No scans yet this session.</div>';
+}
+
+function clearHistory() { scanHistory = []; renderHistory(); }
+
+async function lookupManual() {
+  const id = document.getElementById('manual-id').value.trim();
+  if (!id) return Toast.warning('Enter an Asset ID first.');
+  await processQRResult(id);
+}
+
+document.getElementById('manual-id').addEventListener('keydown', e => {
+  if (e.key === 'Enter') lookupManual();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RailTrack — Maintenance</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">🔧 Maintenance Logs</div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" onclick="openMaintenanceModal()" id="btn-add-maint">
+          ➕ Add Log
+        </button>
+      </div>
+    </header>
+
+    <main class="page-body">
+      <!-- Asset Search -->
+      <div class="card mb-6">
+        <div class="card-body" style="padding:14px 18px">
+          <div class="filter-bar">
+            <div class="search-input-wrap">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="asset-search" placeholder="Search assets by name or ID…" oninput="debounceAssetSearch()"/>
+            </div>
+          </div>
+          <div id="asset-search-results"></div>
+          <div id="selected-asset-banner" style="display:none;margin-top:12px;padding:12px;background:rgba(46,74,138,0.07);border-radius:var(--radius);border:1.5px solid var(--steel)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <span class="text-mono" style="color:var(--steel);font-size:0.8rem" id="sel-asset-id"></span>
+                <span style="font-weight:700;margin-left:10px" id="sel-asset-name"></span>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="clearSelectedAsset()">✕ Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs Table -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title" id="logs-title">All Maintenance Logs</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Asset</th><th>Date</th><th>Type</th>
+                <th>Description</th><th>Technician</th><th>Cost (₹)</th><th>Next Scheduled</th>
+              </tr>
+            </thead>
+            <tbody id="logs-tbody">
+              <tr><td colspan="7" style="text-align:center;padding:40px"><span class="loader loader-dark"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Maintenance Modal -->
+<div class="modal-overlay" id="maint-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Add Maintenance Log</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Asset <span class="req">*</span></label>
+        <input type="text" id="m-asset-search" placeholder="Type asset name or ID to search…" oninput="debounceModalSearch()"/>
+        <div id="m-asset-results" style="margin-top:6px"></div>
+        <input type="hidden" id="m-asset-id"/>
+        <div id="m-selected" style="display:none;margin-top:6px;padding:8px;background:var(--off-white);border-radius:6px;font-size:0.83rem;font-weight:600;color:var(--navy)"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date <span class="req">*</span></label>
+          <input type="date" id="m-date"/>
+        </div>
+        <div class="form-group">
+          <label>Type <span class="req">*</span></label>
+          <select id="m-type">
+            <option>Routine</option><option>Preventive</option>
+            <option>Corrective</option><option>Emergency</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Description <span class="req">*</span></label>
+        <textarea id="m-description" placeholder="Describe the maintenance work performed…"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Technician <span class="req">*</span></label>
+          <input type="text" id="m-tech" placeholder="Name or ID of technician"/>
+        </div>
+        <div class="form-group">
+          <label>Cost (₹)</label>
+          <input type="number" id="m-cost" placeholder="0" min="0"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Next Scheduled Date</label>
+        <input type="date" id="m-next"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMaintenance()">Save Log</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/sidebar.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error('Redirecting');
+renderSidebar('maintenance');
+
+if (!Auth.hasRole('admin','inspector')) {
+  document.getElementById('btn-add-maint').style.display = 'none';
+}
+
+let selectedAssetId = null;
+let debounceTimer = null;
+let modalDebounce = null;
+
+// Pre-select asset from URL param
+const urlParams = new URLSearchParams(window.location.search);
+const preselect = urlParams.get('assetId');
+
+async function loadLogs(assetDbId = null) {
+  const tbody = document.getElementById('logs-tbody');
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px"><span class="loader loader-dark"></span></td></tr>`;
+
+  let url = assetDbId ? `/assets/${assetDbId}` : '/assets?limit=50';
+  const res = await API.get(url);
+  if (!res?.ok) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--signal-red);padding:20px">Failed to load.</td></tr>`;
+    return;
+  }
+
+  let allLogs = [];
+  if (assetDbId) {
+    const asset = res.data.asset;
+    document.getElementById('logs-title').textContent = `Maintenance Logs — ${asset.name}`;
+    (asset.maintenanceLogs || []).forEach(log => allLogs.push({ ...log, assetName: asset.name, assetId: asset.assetId }));
+  } else {
+    document.getElementById('logs-title').textContent = 'All Maintenance Logs';
+    for (const a of res.data.assets || []) {
+      (a.maintenanceLogs || []).forEach(log => allLogs.push({ ...log, assetName: a.name, assetId: a.assetId }));
+    }
+  }
+
+  allLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  tbody.innerHTML = allLogs.length ? allLogs.map(log => `
+    <tr>
+      <td><span style="font-weight:600;font-size:0.83rem">${log.assetName}</span><br><span class="text-mono text-sm" style="color:var(--steel)">${log.assetId}</span></td>
+      <td class="text-sm">${Format.date(log.date)}</td>
+      <td><span class="badge badge-info">${log.type}</span></td>
+      <td style="max-width:260px;font-size:0.83rem">${log.description}</td>
+      <td class="text-sm">${log.technician}</td>
+      <td class="text-sm">${log.cost ? '₹' + log.cost.toLocaleString('en-IN') : '—'}</td>
+      <td class="text-sm text-muted">${Format.date(log.nextScheduled)}</td>
+    </tr>
+  `).join('') : `
+    <tr><td colspan="7">
+      <div class="empty-state"><div class="empty-icon">📋</div><h3>No maintenance logs</h3><p>Add the first log for this asset.</p></div>
+    </td></tr>`;
+}
+
+function debounceAssetSearch() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(searchAssets, 350);
+}
+
+async function searchAssets() {
+  const q = document.getElementById('asset-search').value.trim();
+  const resultsDiv = document.getElementById('asset-search-results');
+  if (!q) { resultsDiv.innerHTML = ''; return; }
+
+  const res = await API.get(`/assets?search=${encodeURIComponent(q)}&limit=5`);
+  if (!res?.ok || !res.data.assets.length) {
+    resultsDiv.innerHTML = '<div class="text-sm text-muted" style="padding:6px">No assets found.</div>';
+    return;
+  }
+  resultsDiv.innerHTML = `
+    <div style="background:var(--white);border:1.5px solid var(--grey-300);border-radius:var(--radius);overflow:hidden;margin-top:6px">
+      ${res.data.assets.map(a => `
+        <div onclick="selectAsset('${a._id}','${a.assetId}','${a.name.replace(/'/g,"&#39;")}')"
+          style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--grey-100);font-size:0.85rem;transition:background 0.15s"
+          onmouseover="this.style.background='var(--off-white)'" onmouseout="this.style.background=''">
+          <span class="text-mono" style="color:var(--steel);font-size:0.78rem">${a.assetId}</span>
+          <span style="font-weight:600;margin-left:8px">${a.name}</span>
+          ${Format.statusBadge(a.status)}
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+function selectAsset(dbId, assetId, name) {
+  selectedAssetId = dbId;
+  document.getElementById('asset-search-results').innerHTML = '';
+  document.getElementById('asset-search').value = '';
+  document.getElementById('sel-asset-id').textContent = assetId;
+  document.getElementById('sel-asset-name').textContent = name;
+  document.getElementById('selected-asset-banner').style.display = 'block';
+  loadLogs(dbId);
+}
+
+function clearSelectedAsset() {
+  selectedAssetId = null;
+  document.getElementById('selected-asset-banner').style.display = 'none';
+  document.getElementById('logs-title').textContent = 'All Maintenance Logs';
+  loadLogs();
+}
+
+function openMaintenanceModal(preAssetId = null) {
+  document.getElementById('m-date').value = new Date().toISOString().slice(0,10);
+  if (preAssetId || selectedAssetId) {
+    document.getElementById('m-asset-id').value = preAssetId || selectedAssetId;
+    document.getElementById('m-selected').textContent = '✓ ' + (document.getElementById('sel-asset-name').textContent || 'Selected asset');
+    document.getElementById('m-selected').style.display = 'block';
+  }
+  document.getElementById('maint-modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('maint-modal').classList.remove('open'); }
+
+function debounceModalSearch() {
+  clearTimeout(modalDebounce);
+  modalDebounce = setTimeout(searchModalAssets, 350);
+}
+
+async function searchModalAssets() {
+  const q = document.getElementById('m-asset-search').value.trim();
+  const div = document.getElementById('m-asset-results');
+  if (!q) { div.innerHTML = ''; return; }
+  const res = await API.get(`/assets?search=${encodeURIComponent(q)}&limit=5`);
+  if (!res?.ok || !res.data.assets.length) { div.innerHTML = '<div class="text-sm text-muted">No assets found.</div>'; return; }
+  div.innerHTML = `
+    <div style="background:var(--white);border:1.5px solid var(--grey-300);border-radius:var(--radius);overflow:hidden">
+      ${res.data.assets.map(a => `
+        <div onclick="selectModalAsset('${a._id}','${a.assetId}','${a.name.replace(/'/g,"&#39;")}')"
+          style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--grey-100);font-size:0.83rem;transition:background 0.15s"
+          onmouseover="this.style.background='var(--off-white)'" onmouseout="this.style.background=''">
+          <span class="text-mono" style="color:var(--steel);font-size:0.76rem">${a.assetId}</span>
+          <span style="font-weight:600;margin-left:8px">${a.name}</span>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+function selectModalAsset(dbId, assetId, name) {
+  document.getElementById('m-asset-id').value = dbId;
+  document.getElementById('m-asset-search').value = '';
+  document.getElementById('m-asset-results').innerHTML = '';
+  document.getElementById('m-selected').textContent = `✓ ${assetId} — ${name}`;
+  document.getElementById('m-selected').style.display = 'block';
+}
+
+async function saveMaintenance() {
+  const assetId = document.getElementById('m-asset-id').value;
+  const date = document.getElementById('m-date').value;
+  const type = document.getElementById('m-type').value;
+  const description = document.getElementById('m-description').value.trim();
+  const technician = document.getElementById('m-tech').value.trim();
+
+  if (!assetId) return Toast.error('Please select an asset.');
+  if (!date || !description || !technician) return Toast.error('Date, description, and technician are required.');
+
+  const body = {
+    date, type, description, technician,
+    cost: parseFloat(document.getElementById('m-cost').value) || 0,
+    nextScheduled: document.getElementById('m-next').value || undefined
+  };
+
+  const res = await API.post(`/assets/${assetId}/maintenance`, body);
+  if (res?.ok) {
+    Toast.success('Maintenance log saved!');
+    closeModal();
+    loadLogs(selectedAssetId || null);
+    // Reset form
+    ['m-asset-id','m-description','m-tech','m-cost','m-next'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('m-selected').style.display = 'none';
+  } else {
+    Toast.error(res?.data?.message || 'Failed to save log.');
+  }
+}
+
+// Init
+if (preselect) {
+  API.get(`/assets/${preselect}`).then(res => {
+    if (res?.ok) {
+      const a = res.data.asset;
+      selectAsset(a._id, a.assetId, a.name);
+    }
+  });
+} else {
+  loadLogs();
+}
+</script>
+</body>
+</html>

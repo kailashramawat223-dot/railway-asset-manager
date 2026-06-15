@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RailTrack — Assets</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">🚂 Assets</div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" onclick="openAssetModal()" id="btn-add-asset">
+          ➕ Add Asset
+        </button>
+      </div>
+    </header>
+
+    <main class="page-body">
+      <!-- Filters -->
+      <div class="card mb-6">
+        <div class="card-body" style="padding:14px 18px">
+          <div class="filter-bar">
+            <div class="search-input-wrap">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="search-input" placeholder="Search by name, ID, serial…" oninput="debounceLoad()"/>
+            </div>
+            <select id="filter-status" onchange="loadAssets()">
+              <option value="">All Statuses</option>
+              <option>Operational</option>
+              <option>Under Maintenance</option>
+              <option>Faulty</option>
+              <option>Standby</option>
+              <option>Decommissioned</option>
+            </select>
+            <select id="filter-category" onchange="loadAssets()">
+              <option value="">All Categories</option>
+              <option>Locomotive</option><option>Wagon</option><option>Coach</option>
+              <option>Track</option><option>Signal</option><option>Bridge</option>
+              <option>Station Equipment</option><option>Power Supply</option>
+              <option>Communication</option><option>Other</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Asset ID</th><th>Name</th><th>Category</th><th>Status</th>
+                <th>Location</th><th>Last Inspected</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="assets-tbody">
+              <tr><td colspan="7" style="text-align:center;padding:40px"><span class="loader loader-dark"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span id="pagination-info">Loading…</span>
+          <div class="pagination-btns" id="pagination-btns"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ── Asset Form Modal ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="asset-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Add New Asset</span>
+      <button class="modal-close" onclick="closeModal('asset-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-asset-id"/>
+
+      <div style="background:var(--off-white);border-radius:var(--radius);padding:16px;margin-bottom:18px">
+        <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--grey-500);margin-bottom:10px">Basic Information</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Asset Name <span class="req">*</span></label>
+            <input type="text" id="f-name" placeholder="e.g. WAP-7 Locomotive #4521"/>
+          </div>
+          <div class="form-group">
+            <label>Category <span class="req">*</span></label>
+            <select id="f-category">
+              <option value="">Select category</option>
+              <option>Locomotive</option><option>Wagon</option><option>Coach</option>
+              <option>Track</option><option>Signal</option><option>Bridge</option>
+              <option>Station Equipment</option><option>Power Supply</option>
+              <option>Communication</option><option>Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Status</label>
+            <select id="f-status">
+              <option>Operational</option><option>Under Maintenance</option>
+              <option>Faulty</option><option>Standby</option><option>Decommissioned</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Serial Number</label>
+            <input type="text" id="f-serial" placeholder="Manufacturer serial no."/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="f-description" placeholder="Additional notes about this asset…"></textarea>
+        </div>
+      </div>
+
+      <div style="background:var(--off-white);border-radius:var(--radius);padding:16px;margin-bottom:18px">
+        <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--grey-500);margin-bottom:10px">Location</div>
+        <div class="form-row-3">
+          <div class="form-group">
+            <label>Zone <span class="req">*</span></label>
+            <select id="f-zone">
+              <option value="">Select zone</option>
+              <option>Northern Railway</option><option>Southern Railway</option>
+              <option>Eastern Railway</option><option>Western Railway</option>
+              <option>Central Railway</option><option>North Eastern Railway</option>
+              <option>Northeast Frontier Railway</option><option>South Eastern Railway</option>
+              <option>South Central Railway</option><option>North Western Railway</option>
+              <option>North Central Railway</option><option>South Western Railway</option>
+              <option>East Central Railway</option><option>East Coast Railway</option>
+              <option>West Central Railway</option><option>Metro Railway Kolkata</option>
+              <option>South East Central Railway</option><option>Konkan Railway</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Division</label>
+            <input type="text" id="f-division" placeholder="e.g. Delhi Division"/>
+          </div>
+          <div class="form-group">
+            <label>Station / Section</label>
+            <input type="text" id="f-station" placeholder="e.g. NDLS"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Track / Platform</label>
+          <input type="text" id="f-track" placeholder="e.g. Platform 3, Track 12"/>
+        </div>
+      </div>
+
+      <div style="background:var(--off-white);border-radius:var(--radius);padding:16px">
+        <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--grey-500);margin-bottom:10px">Technical Details</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Manufacturer</label>
+            <input type="text" id="f-manufacturer" placeholder="e.g. CLW, BHEL, ICF"/>
+          </div>
+          <div class="form-group">
+            <label>Model</label>
+            <input type="text" id="f-model" placeholder="e.g. WAP-7"/>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Purchase Date</label>
+            <input type="date" id="f-purchase"/>
+          </div>
+          <div class="form-group">
+            <label>Warranty Expiry</label>
+            <input type="date" id="f-warranty"/>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Next Inspection Due</label>
+            <input type="date" id="f-next-inspection"/>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('asset-modal')">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-asset" onclick="saveAsset()">Save Asset</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Asset Detail Modal ───────────────────────────────────────── -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title" id="detail-title">Asset Details</span>
+      <button class="modal-close" onclick="closeModal('detail-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+    <div class="modal-footer" id="detail-footer"></div>
+  </div>
+</div>
+
+<!-- ── Delete Confirm ──────────────────────────────────────────── -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title">Confirm Delete</span>
+      <button class="modal-close" onclick="closeModal('delete-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--grey-700)">Are you sure you want to permanently delete this asset? This action cannot be undone.</p>
+      <p style="font-size:0.82rem;color:var(--grey-500);margin-top:8px">All maintenance logs associated with this asset will also be removed.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('delete-modal')">Cancel</button>
+      <button class="btn btn-danger" id="btn-confirm-delete" onclick="confirmDelete()">Delete Asset</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/sidebar.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error('Redirecting');
+renderSidebar('assets');
+
+// Hide add button for viewers
+if (!Auth.hasRole('admin', 'inspector')) {
+  document.getElementById('btn-add-asset').style.display = 'none';
+}
+
+let currentPage = 1;
+let deleteTargetId = null;
+let debounceTimer = null;
+
+function debounceLoad() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(loadAssets, 350);
+}
+
+function clearFilters() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('filter-status').value = '';
+  document.getElementById('filter-category').value = '';
+  loadAssets();
+}
+
+async function loadAssets(page = 1) {
+  currentPage = page;
+  const search = document.getElementById('search-input').value.trim();
+  const status = document.getElementById('filter-status').value;
+  const category = document.getElementById('filter-category').value;
+
+  let url = `/assets?page=${page}&limit=15`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  if (status) url += `&status=${encodeURIComponent(status)}`;
+  if (category) url += `&category=${encodeURIComponent(category)}`;
+
+  const tbody = document.getElementById('assets-tbody');
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px"><span class="loader loader-dark"></span></td></tr>`;
+
+  const res = await API.get(url);
+  if (!res?.ok) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--signal-red);padding:30px">Failed to load assets.</td></tr>`;
+    return;
+  }
+
+  const { assets, total, pages } = res.data;
+  tbody.innerHTML = assets.length ? assets.map(a => `
+    <tr>
+      <td class="asset-id-cell">${a.assetId}</td>
+      <td><span style="font-weight:600;cursor:pointer;color:var(--navy)" onclick="viewAsset('${a._id}')">${a.name}</span></td>
+      <td class="text-sm">${a.category}</td>
+      <td>${Format.statusBadge(a.status)}</td>
+      <td class="text-sm text-muted">${a.location?.zone || '—'}<br><span style="font-size:0.72rem">${a.location?.station || ''}</span></td>
+      <td class="text-sm text-muted">${Format.date(a.lastInspectionDate)}</td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm btn-icon" title="View" onclick="viewAsset('${a._id}')">👁</button>
+          ${Auth.hasRole('admin','inspector') ? `<button class="btn btn-ghost btn-sm btn-icon" title="Edit" onclick="editAsset('${a._id}')">✏️</button>` : ''}
+          ${Auth.hasRole('admin') ? `<button class="btn btn-danger btn-sm btn-icon" title="Delete" onclick="deleteAsset('${a._id}')">🗑</button>` : ''}
+        </div>
+      </td>
+    </tr>
+  `).join('') : `
+    <tr><td colspan="7">
+      <div class="empty-state"><div class="empty-icon">🔍</div><h3>No assets found</h3><p>Try adjusting your search or filters.</p></div>
+    </td></tr>`;
+
+  // Pagination
+  document.getElementById('pagination-info').textContent = `${total} asset${total !== 1 ? 's' : ''} · Page ${page} of ${pages || 1}`;
+  const btns = document.getElementById('pagination-btns');
+  btns.innerHTML = '';
+  if (pages > 1) {
+    for (let i = 1; i <= pages; i++) {
+      const btn = document.createElement('button');
+      btn.className = `page-btn${i === page ? ' active' : ''}`;
+      btn.textContent = i;
+      btn.onclick = () => loadAssets(i);
+      btns.appendChild(btn);
+    }
+  }
+}
+
+function openAssetModal(data = null) {
+  document.getElementById('modal-title').textContent = data ? 'Edit Asset' : 'Add New Asset';
+  document.getElementById('edit-asset-id').value = data?._id || '';
+  document.getElementById('f-name').value = data?.name || '';
+  document.getElementById('f-category').value = data?.category || '';
+  document.getElementById('f-status').value = data?.status || 'Operational';
+  document.getElementById('f-serial').value = data?.serialNumber || '';
+  document.getElementById('f-description').value = data?.description || '';
+  document.getElementById('f-zone').value = data?.location?.zone || '';
+  document.getElementById('f-division').value = data?.location?.division || '';
+  document.getElementById('f-station').value = data?.location?.station || '';
+  document.getElementById('f-track').value = data?.location?.track || '';
+  document.getElementById('f-manufacturer').value = data?.manufacturer || '';
+  document.getElementById('f-model').value = data?.model || '';
+  document.getElementById('f-purchase').value = data?.purchaseDate ? data.purchaseDate.slice(0,10) : '';
+  document.getElementById('f-warranty').value = data?.warrantyExpiry ? data.warrantyExpiry.slice(0,10) : '';
+  document.getElementById('f-next-inspection').value = data?.nextInspectionDate ? data.nextInspectionDate.slice(0,10) : '';
+  document.getElementById('asset-modal').classList.add('open');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+async function saveAsset() {
+  const name = document.getElementById('f-name').value.trim();
+  const category = document.getElementById('f-category').value;
+  const zone = document.getElementById('f-zone').value;
+  if (!name || !category || !zone) return Toast.error('Name, category, and zone are required.');
+
+  const body = {
+    name, category,
+    status: document.getElementById('f-status').value,
+    serialNumber: document.getElementById('f-serial').value,
+    description: document.getElementById('f-description').value,
+    location: {
+      zone,
+      division: document.getElementById('f-division').value,
+      station: document.getElementById('f-station').value,
+      track: document.getElementById('f-track').value
+    },
+    manufacturer: document.getElementById('f-manufacturer').value,
+    model: document.getElementById('f-model').value,
+    purchaseDate: document.getElementById('f-purchase').value || undefined,
+    warrantyExpiry: document.getElementById('f-warranty').value || undefined,
+    nextInspectionDate: document.getElementById('f-next-inspection').value || undefined
+  };
+
+  const editId = document.getElementById('edit-asset-id').value;
+  const btn = document.getElementById('btn-save-asset');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span> Saving…';
+
+  const res = editId ? await API.put(`/assets/${editId}`, body) : await API.post('/assets', body);
+
+  btn.disabled = false;
+  btn.innerHTML = 'Save Asset';
+
+  if (res?.ok) {
+    Toast.success(editId ? 'Asset updated!' : 'Asset created with QR code!');
+    closeModal('asset-modal');
+    loadAssets(currentPage);
+  } else {
+    Toast.error(res?.data?.message || 'Save failed.');
+  }
+}
+
+async function viewAsset(id) {
+  const res = await API.get(`/assets/${id}`);
+  if (!res?.ok) return Toast.error('Could not load asset.');
+  const a = res.data.asset;
+
+  document.getElementById('detail-title').textContent = `${a.assetId} — ${a.name}`;
+  document.getElementById('detail-body').innerHTML = `
+    <div class="detail-grid">
+      <div class="detail-section">
+        <h4>Basic Info</h4>
+        <div class="detail-row"><span class="detail-label">Asset ID</span><span class="detail-value text-mono">${a.assetId}</span></div>
+        <div class="detail-row"><span class="detail-label">Category</span><span class="detail-value">${a.category}</span></div>
+        <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${Format.statusBadge(a.status)}</span></div>
+        <div class="detail-row"><span class="detail-label">Serial No.</span><span class="detail-value text-mono">${a.serialNumber || '—'}</span></div>
+        <div class="detail-row"><span class="detail-label">Manufacturer</span><span class="detail-value">${a.manufacturer || '—'}</span></div>
+        <div class="detail-row"><span class="detail-label">Model</span><span class="detail-value">${a.model || '—'}</span></div>
+        <div class="detail-row"><span class="detail-label">Purchase Date</span><span class="detail-value">${Format.date(a.purchaseDate)}</span></div>
+        <div class="detail-row"><span class="detail-label">Warranty Expiry</span><span class="detail-value">${Format.date(a.warrantyExpiry)}</span></div>
+        ${a.description ? `<p style="margin-top:10px;font-size:0.83rem;color:var(--grey-700);background:var(--off-white);padding:10px;border-radius:6px">${a.description}</p>` : ''}
+      </div>
+      <div>
+        <div class="detail-section">
+          <h4>Location</h4>
+          <div class="detail-row"><span class="detail-label">Zone</span><span class="detail-value">${a.location?.zone || '—'}</span></div>
+          <div class="detail-row"><span class="detail-label">Division</span><span class="detail-value">${a.location?.division || '—'}</span></div>
+          <div class="detail-row"><span class="detail-label">Station</span><span class="detail-value">${a.location?.station || '—'}</span></div>
+          <div class="detail-row"><span class="detail-label">Track/Platform</span><span class="detail-value">${a.location?.track || '—'}</span></div>
+        </div>
+        <div class="detail-section" style="margin-top:16px">
+          <h4>Inspection</h4>
+          <div class="detail-row"><span class="detail-label">Last Inspected</span><span class="detail-value">${Format.date(a.lastInspectionDate)}</span></div>
+          <div class="detail-row"><span class="detail-label">Next Due</span><span class="detail-value">${Format.date(a.nextInspectionDate)}</span></div>
+        </div>
+        ${a.qrCode ? `
+          <div class="qr-container" style="margin-top:16px">
+            <img src="${a.qrCode}" alt="QR Code" style="max-width:160px"/>
+            <div class="qr-label">${a.assetId}</div>
+            <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="downloadQR('${a._id}','${a.assetId}')">⬇ Download QR</button>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+    ${a.maintenanceLogs?.length ? `
+      <div style="margin-top:20px">
+        <h4 style="font-size:0.75rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--grey-500);margin-bottom:12px">Maintenance History (${a.maintenanceLogs.length})</h4>
+        <div class="timeline">
+          ${a.maintenanceLogs.slice().reverse().map(log => `
+            <div class="timeline-item">
+              <div class="timeline-meta">
+                <span class="timeline-date">📅 ${Format.date(log.date)}</span>
+                <span class="badge badge-info timeline-type">${log.type}</span>
+              </div>
+              <div class="timeline-desc">${log.description}</div>
+              <div class="timeline-tech">👷 ${log.technician}${log.cost ? ` · ₹${log.cost.toLocaleString('en-IN')}` : ''}</div>
+              ${log.nextScheduled ? `<div class="timeline-tech">🔜 Next: ${Format.date(log.nextScheduled)}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
+  `;
+  document.getElementById('detail-footer').innerHTML = `
+    ${Auth.hasRole('admin','inspector') ? `
+      <button class="btn btn-ghost" onclick="addMaintenance('${a._id}')">🔧 Add Maintenance Log</button>
+      <button class="btn btn-primary" onclick="closeModal('detail-modal');editAsset('${a._id}')">✏️ Edit Asset</button>
+    ` : ''}
+    <button class="btn btn-ghost" onclick="closeModal('detail-modal')">Close</button>
+  `;
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+async function editAsset(id) {
+  const res = await API.get(`/assets/${id}`);
+  if (!res?.ok) return Toast.error('Could not load asset.');
+  openAssetModal(res.data.asset);
+}
+
+function deleteAsset(id) {
+  deleteTargetId = id;
+  document.getElementById('delete-modal').classList.add('open');
+}
+
+async function confirmDelete() {
+  if (!deleteTargetId) return;
+  const btn = document.getElementById('btn-confirm-delete');
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  const res = await API.delete(`/assets/${deleteTargetId}`);
+  if (res?.ok) {
+    Toast.success('Asset deleted.');
+    closeModal('delete-modal');
+    loadAssets(currentPage);
+  } else {
+    Toast.error(res?.data?.message || 'Delete failed.');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Delete Asset';
+  deleteTargetId = null;
+}
+
+async function downloadQR(assetDbId, assetId) {
+  const res = await API.get(`/assets/${assetDbId}/qr`);
+  if (!res?.ok) return Toast.error('Could not fetch QR.');
+  const link = document.createElement('a');
+  link.href = res.data.qrCode;
+  link.download = `QR_${assetId}.png`;
+  link.click();
+  Toast.success('QR code downloaded!');
+}
+
+function addMaintenance(assetId) {
+  closeModal('detail-modal');
+  window.location.href = `maintenance.html?assetId=${assetId}`;
+}
+
+// Check for ?action=new in URL
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('action') === 'new' && Auth.hasRole('admin','inspector')) {
+  openAssetModal();
+}
+
+loadAssets();
+</script>
+</body>
+</html>
